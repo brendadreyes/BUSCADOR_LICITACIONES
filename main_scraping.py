@@ -37,26 +37,26 @@ def main(fecha_proceso = None, usar_scraping = True):
 
         df_and = df_esp = df_eus = df_mad = None
         # Ejecutar scrapers
-        print("🟢 Ejecutando scraper Andalucía...")
-        df_and = ScraperAndalucia(fecha = fecha_ejecucion,
-                                  fecha_minima=fecha_minima,
-                                  config_file = config_path).ejecutar()
+        # print("🟢 Ejecutando scraper Andalucía...")
+        # df_and = ScraperAndalucia(fecha = fecha_ejecucion,
+        #                           fecha_minima=fecha_minima,
+        #                           config_file = config_path).ejecutar()
         print("✅ Scraper Andalucía completado!")
 
         print("🟢 Ejecutando scraper Estado...")
         df_esp = ScraperEspana(fecha = fecha_ejecucion,
                                config_file = config_path).ejecutar()
         print("✅ Scraper España completado!")
-        print("🟢 Ejecutando scraper Euskadi...")
-        df_eus = ScraperEuskadi(fecha = fecha_ejecucion,
-                                fecha_minima=fecha_minima,
-                                config_file = config_path).ejecutar()
-        print("✅ Scraper Euskadi completado!")
-        print("🟢 Ejecutando scraper Madrid...")
-        df_mad = ScraperMadrid(fecha = fecha_ejecucion,
-                               config_file = config_path,
-                               fecha_minima = fecha_minima).ejecutar()
-        print("✅ Scraper Madrid completado!")
+        # print("🟢 Ejecutando scraper Euskadi...")
+        # df_eus = ScraperEuskadi(fecha = fecha_ejecucion,
+        #                         fecha_minima=fecha_minima,
+        #                         config_file = config_path).ejecutar()
+        # print("✅ Scraper Euskadi completado!")
+        # print("🟢 Ejecutando scraper Madrid...")
+        # df_mad = ScraperMadrid(fecha = fecha_ejecucion,
+        #                        config_file = config_path,
+        #                        fecha_minima = fecha_minima).ejecutar()
+        # print("✅ Scraper Madrid completado!")
     else:
         print(f"🟢 Leyendo ficheros de licitaciones...")
         # 🟠 Leer datos desde CSVs en carpeta de datos
@@ -141,6 +141,8 @@ def main(fecha_proceso = None, usar_scraping = True):
     print("🟢 Clasificación de texto...")
     processor = lda_processor.LicitacionTextProcessor(df_unificado, config_file="./config/scraper_config.ini")
     df_final = processor.procesar_completo()
+    print('################### IS NA ? ')
+    print(df_final.isna().sum())
     # Guardar
     output_file = os.path.join(output_dir, f"licitaciones.csv")
     df_final = df_final.dropna(subset=['titulo'])
