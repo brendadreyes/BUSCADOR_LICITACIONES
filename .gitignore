@@ -1,6 +1,3 @@
-venv/
-env/
-
 datos_licitaciones/
 datos_licitaciones_favoritas/
 cambios_licitaciones_favoritas/
@@ -8,9 +5,10 @@ prueba.csv
 *pdf
 *.pyc
 .idea/workspace.xml
+venv/
 
 __pycache__/
 *.py[cod]
 *.pyo
 *.log
-*.txt
+/logs
