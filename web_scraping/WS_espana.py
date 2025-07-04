@@ -30,8 +30,8 @@ class ScraperEspana:
         self.url = config.get("urls", "base_esp")
         if not self.url:
             raise ValueError("❌ La URL de la Plataforma de Contratación del Estado no está definida en el .ini")
-
-        self.MAX_PAGINAS = config.getint("esp_params", "max_paginas", fallback=1)
+        max_paginas_str = config.get('esp_params', "max_paginas", fallback="None")
+        self.MAX_PAGINAS = None if (max_paginas_str.strip().lower() in ["none", ""]) else int(max_paginas_str)
         self.TIMEOUT = config.getint("esp_params", "timeout", fallback=30)
         self.fecha_minima = fecha_minima
         try:
@@ -259,7 +259,7 @@ class ScraperEspana:
                 lic["pagina"] = pagina
             todas_licitaciones.extend(licitaciones)
 
-            if self.MAX_PAGINAS and pagina >= self.MAX_PAGINAS:
+            if (self.MAX_PAGINAS is not None) and (pagina >= self.MAX_PAGINAS):
                 break
             if not self.siguiente_pagina():
                 break

@@ -227,7 +227,6 @@ class ScraperAndalucia:
             except TimeoutException:
                 print(f"❌ No se encontró la tabla en la URL actual ({self.driver.current_url}).")
                 break
-
             time.sleep(1.5)
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             tabla = soup.select_one('table.p-datatable-table')
@@ -240,7 +239,7 @@ class ScraperAndalucia:
             if not filas:
                 print("ℹ️ La tabla existe pero no contiene filas.")
                 break
-
+            
             print(f"📄 Página {pagina}")
             for fila in filas:
                 celdas = fila.find_all('td')
