@@ -20,7 +20,7 @@ def main(fecha_proceso = None, usar_scraping = True):
     original_stdout = sys.stdout  # Guarda la salida original
 
     with open(log_filename, "w", encoding="utf-8") as log_file:
-        # sys.stdout = log_file  # Redirige print() al archivo
+        sys.stdout = log_file  # Redirige print() al archivo
         # Cargar configs
         config_path = "./config/scraper_config.ini"
         columns_path = "./config/scraper_columns.ini"
