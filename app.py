@@ -1,13 +1,11 @@
 import os
-os.environ["STREAMLIT_WATCH_USE_POLLING"] = "true"
-import os
 import configparser
 import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
 import src.functions as functions
 from unidecode import unidecode
-
+import numpy as np
 # -------------------------------
 # Cargar config INI (scraper y columnas)
 # -------------------------------
@@ -63,6 +61,36 @@ def aplica_filtros_base(df, fecha_ini):
 
     return df_filter
 
+# -----------------------------------------------------------
+# Buscar actualizaciones en WEBs para licitaciones favoritas
+# -----------------------------------------------------------
+def buscar_actualizaciones_favs(favoritos_df):
+    from web_scraping.WS_licitaciones_favs import ScraperLicFav
+    try:
+        if 'Fecha Ejecución Proceso' in favoritos_df.columns:
+            fecha_ultima_eje = pd.to_datetime(favoritos_df['Fecha Ejecución Proceso'], errors='coerce').max()
+        else:
+            st.warning("⚠️ No se encontró 'Fecha Ejecución Proceso' en las filas favoritas.")
+            return None
+        hoy = datetime.today().date()
+        config_path = "./config/scraper_config.ini"
+
+        scraper = ScraperLicFav(
+            df=favoritos_df,
+            fecha_ultima_eje=fecha_ultima_eje,
+            fecha=hoy,
+            url_col="URL",
+            fuente_col="Fuente",
+            config_file=config_path
+        )
+        resultado_df = scraper.ejecutar()
+
+        return resultado_df
+    except Exception as e:
+        st.error(f"❌ Error buscando actualizaciones: {e}")
+        return None
+
+
 # -------------------------------
 # MAIN APP
 # -------------------------------
@@ -75,7 +103,7 @@ def main():
     df, _ = cargar_datos(output_dir)
 
     if df is not None and not df.empty:
-        df = df.rename(columns=rename_dict)
+        df = df[[col for col in rename_dict if col in df.columns]].rename(columns=rename_dict)
         if 'Fecha Ejecución Proceso' in df.columns:
             fechas_proceso = pd.to_datetime(df['Fecha Ejecución Proceso'], errors='coerce').dropna()
             if not fechas_proceso.empty:
@@ -208,8 +236,8 @@ def main():
 
     if "CoincidePalabra" not in df_favoritos.columns:
         df_favoritos["CoincidePalabra"] = False
-        
-    df_filtrado_actual = pd.concat([df_favoritos.dropna(how='all', axis=1), df_no_favoritos.dropna(how='all', axis=1)], ignore_index=True).drop_duplicates()
+
+    df_filtrado_actual = pd.concat([df_favoritos, df_no_favoritos], ignore_index=True).drop_duplicates()
 
     def resaltar_filas(row):
         if row.get("Favorito", False):
@@ -218,12 +246,10 @@ def main():
             return ['background-color: #ffe5e5'] * len(row)
         else:
             return [''] * len(row)
-
+    
     df_style = df_filtrado_actual[cols_mostrar + ["Favorito", "CoincidePalabra"]] if "Favorito" in df_filtrado_actual.columns else df_filtrado_actual[cols_mostrar + ["CoincidePalabra"]]
     df_style["Favorito"] = df_style["Favorito"].apply(lambda x: "⭐" if x else "")
-
     formato_numerico = {col: "{:,.2f}".format for col in df_style.select_dtypes(include=['float', 'int']).columns}
-
     st.dataframe(
         df_style.style.format(formato_numerico).apply(resaltar_filas, axis=1),
         column_config={"URL": st.column_config.LinkColumn("URL")},
@@ -270,38 +296,15 @@ def main():
                                            file_name="actualizaciones_favoritas.csv",
                                            mime="text/csv")
 
-                        
+
     # Notas al pie
     st.markdown("---")
     st.caption("""
     **Fuente de datos:** [Portal de Contratación del Estado Español](https://contrataciondelestado.es/wps/portal/!ut/p/b1/jc7LDoIwEAXQb-EDzExLqbAEyqMEBeWh7YawMAbDY2P8fqtxKzq7m5ybuaBBbQhB16OUEBvOoOf-MVz7-7DM_fjKmncsKsIwTim6lS2Q5qJpeGpi4higDHDskLVZW_JKJogyjUXeEAcTyv_r45fz8Vf_BHqd0A9Ym_gGKxv26TJdQBm27fw2OvjSs7EIjuZRVu7qMqEEkUENSgQw6TH25I31vmU9AXx4is8!/dl4/d5/L2dBISEvZ0FBIS9nQSEh/pw/Z7_AVEQAI930OBRD02JPMTPG21004/act/id=0/p=javax.servlet.include.path_info=QCPjspQCPbusquedaQCPFormularioBusqueda.jsp/610892277200/-/), [Junta de Andalucía](https://www.juntadeandalucia.es/haciendayadministracionpublica/apl/pdc-front-publico/perfiles-licitaciones/buscador-general), [Contratos públicos Comunidad de Madrid](https://contratos-publicos.comunidad.madrid), [Contratos Euskadi](https://www.uragentzia.euskadi.eus/webura00-contents/es/contenidos/informacion/widget_kontratazio_ura/es_def/widget-contratacion/anuncios-abiertos.html)      
     **Nota:** Los resultados pueden estar limitados por filtros aplicados en scraping. Para búsquedas más avanzadas, visita el portal directamente.
     """) 
-def buscar_actualizaciones_favs(favoritos_df):
-    from web_scraping.WS_licitaciones_favs import ScraperLicFav
-    try:
-        if 'Fecha Ejecución Proceso' in favoritos_df.columns:
-            fecha_ultima_eje = pd.to_datetime(favoritos_df['Fecha Ejecución Proceso'], errors='coerce').max()
-        else:
-            st.warning("⚠️ No se encontró 'Fecha Ejecución Proceso' en las filas favoritas.")
-            return None
-        hoy = datetime.today().date()
-        config_path = "./config/scraper_config.ini"
 
-        scraper = ScraperLicFav(
-            df=favoritos_df,
-            fecha_ultima_eje=fecha_ultima_eje,
-            fecha=hoy,
-            url_col="URL",
-            fuente_col="Fuente",
-            config_file=config_path
-        )
-        resultado_df = scraper.ejecutar()
 
-        return resultado_df
-    except Exception as e:
-        st.error(f"❌ Error buscando actualizaciones: {e}")
-        return None
 
 
 

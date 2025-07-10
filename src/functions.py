@@ -4,6 +4,7 @@ import re
 import os
 import unicodedata
 from datetime import datetime
+from unidecode import unidecode
 
 def get_columns_dict(section):
     """
@@ -114,21 +115,100 @@ def combinar_duplicados_por_expediente(df, col_exp):
     return df_sin_duplicados
 
 
-def filtrar_renombrar_dataframe(df, comunidad, columnas_finales, columnas_iniciales_comunidad, fecha_proceso):
+def extraer_localizacion_final(lugar, fuente, df_nuts):
     """
-    Filtra y renombra un DataFrame según el mapeo de columnas finales y comunidad.
-    Añade 'comunidad' y 'fecha_proceso'.
+    Extrae y normaliza la localización (provincia o comunidad autónoma) a partir del campo 'Lugar de ejecución'.
 
-    Args:
-        df: DataFrame original
-        comunidad: str ('and', 'esp', 'eus', 'mad')
-        columnas_finales: dict {nombre_final: indice}
-        columnas_iniciales_comunidad: dict {columna_comunidad: indice}
-        fecha_proceso: str, fecha en formato 'YYYY-MM-DD'
+    Devuelve un diccionario con:
+    - 'ubicacion': texto principal (provincia, localidad, etc.)
+    - 'comunidad_autonoma': comunidad si se puede inferir, o 'fuente' como fallback
+    """
+    def normalizar(texto):
+        if not isinstance(texto, str):
+            return "NotFound"
+        return unidecode(texto).strip().lower().title()
+
+    ubicacion = None
+    comunidad = None
+
+    if not isinstance(lugar, str) or lugar.strip().lower() == "notfound":
+        fuente_val = normalizar(fuente) if isinstance(fuente, str) else "NotFound"
+        return {"ubicacion": fuente_val, "comunidad_autonoma": fuente_val}
+
+    # Buscar código NUTS (ej. ES61 o ES616)
+    match = re.search(r'ES\d{2,3}', lugar)
+    if match:
+        codigo_nuts = match.group(0)[2:]  # quitar 'ES'
+
+        # Buscar provincia (nut_3)
+        mask_nut3 = df_nuts['nut_3'].notna()
+        nut3_convertida = df_nuts.loc[mask_nut3, 'nut_3'].astype(int).astype(str)
+        mask_codigo_3 = pd.Series(False, index=df_nuts.index)
+        mask_codigo_3.loc[mask_nut3] = nut3_convertida == codigo_nuts
+
+        prov = df_nuts[mask_codigo_3]
+        if not prov.empty:
+            ubicacion = prov.iloc[0]['provincia']
+            comunidad = prov.iloc[0]['comunidad_autonoma']
+            return {
+                "ubicacion": normalizar(ubicacion),
+                "comunidad_autonoma": normalizar(comunidad if isinstance(comunidad, str) else fuente)
+            }
+
+        # Buscar comunidad (nut_2)
+        mask_nut2 = df_nuts['nut_2'].notna()
+        nut2_convertida = df_nuts.loc[mask_nut2, 'nut_2'].astype(int).astype(str)
+        mask_codigo_2 = pd.Series(False, index=df_nuts.index)
+        mask_codigo_2.loc[mask_nut2] = nut2_convertida == codigo_nuts
+
+        ccaa = df_nuts[mask_codigo_2]
+        if not ccaa.empty:
+            comunidad = ccaa.iloc[0]['comunidad_autonoma']
+            return {
+                "ubicacion": normalizar(comunidad),
+                "comunidad_autonoma": normalizar(comunidad if isinstance(comunidad, str) else fuente)
+            }
+
+    # Si no hay código NUTS, aplicar limpieza del texto
+    partes = [p.strip() for p in lugar.split(" - ") if p.strip()]
+    if len(partes) == 3:
+        _, provincia, localidad = partes
+        if provincia.lower() == localidad.lower():
+            ubicacion = localidad
+        else:
+            ubicacion = f"{provincia} ({localidad})"
+        # Buscar comunidad asociada
+        prov_match = df_nuts[df_nuts['provincia'].str.lower() == provincia.lower()]
+        if not prov_match.empty:
+            comunidad = prov_match.iloc[0]['comunidad_autonoma']
+    elif len(partes) == 2:
+        _, localidad = partes
+        ubicacion = localidad
+    elif len(partes) == 1:
+        ubicacion = partes[0]
+    else:
+        fuente_val = normalizar(fuente) if isinstance(fuente, str) else "NotFound"
+        return {"ubicacion": fuente_val, "comunidad_autonoma": fuente_val}
+
+    comunidad_final = comunidad if isinstance(comunidad, str) else fuente
+    return {
+        "ubicacion": normalizar(ubicacion),
+        "comunidad_autonoma": normalizar(comunidad_final)
+    }
+
+def filtrar_renombrar_dataframe(df, comunidad, filename_codigo_nuts, columnas_finales, columnas_iniciales_comunidad, fecha_proceso):
+    """
+    Filtra y transforma un DataFrame de licitaciones según la comunidad autónoma.
+
+    - Renombra y ordena columnas según mapeos definidos.
+    - Limpia fechas e importes.
+    - Añade columnas 'fuente' y 'fecha_proceso'.
+    - Normaliza 'lugar_ejecucion' usando códigos NUTS si el archivo existe.
 
     Returns:
-        DataFrame filtrado y renombrado
+        DataFrame transformado y listo para análisis o exportación.
     """
+
     # Invertir columnas_finales para buscar por índice
     index_to_final_name = {v: k for k, v in columnas_finales.items()}
     map_comunidad = {'and':'Andalucía','esp':'España','eus':'Euskadi','mad':'Comunidad de Madrid'}
@@ -160,6 +240,17 @@ def filtrar_renombrar_dataframe(df, comunidad, columnas_finales, columnas_inicia
     # Añadir columnas extra
     df_final["fuente"] = map_comunidad.get(comunidad,'')
     df_final["fecha_proceso"] = fecha_proceso   
+    if os.path.exists(filename_codigo_nuts):
+        df_nuts = pd.read_csv(filename_codigo_nuts, sep = ';')
+        df_final[["provincia_ejecucion", "comunidad_autonoma_ejecucion"]] = df_final.apply(
+            lambda row: pd.Series(extraer_localizacion_final(row["lugar_ejecucion"], row["fuente"], df_nuts)),
+            axis=1
+        )        
+        df_final.drop("lugar_ejecucion",axis = 1,inplace = True)
+    
+    else:
+        print("⚠️ No se encontró el archivo de códigos NUTS. Se mostrará la ubicación original sin procesar.")
+        df_final["lugar_ejecucion"] = df_final["lugar_ejecucion"]
     return df_final
 
 def normalizar_texto(texto):

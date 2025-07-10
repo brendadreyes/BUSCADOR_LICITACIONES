@@ -20,7 +20,7 @@ def main(fecha_proceso = None, usar_scraping = True):
     original_stdout = sys.stdout  # Guarda la salida original
 
     with open(log_filename, "w", encoding="utf-8") as log_file:
-        sys.stdout = log_file  # Redirige print() al archivo
+        # sys.stdout = log_file  # Redirige print() al archivo
         # Cargar configs
         config_path = "./config/scraper_config.ini"
         columns_path = "./config/scraper_columns.ini"
@@ -28,7 +28,7 @@ def main(fecha_proceso = None, usar_scraping = True):
         config.read(config_path)
         columns_ini = configparser.ConfigParser()
         columns_ini.read(columns_path)
-
+        filename_codigo_nuts = config.get("input_output_path", "filename_codigo_nuts")
         output_dir = config.get("input_output_path", "output_dir_final", fallback="./output_final")
         dias_fecha_min = int(config.get("all_params", "dias_fecha_min"))
         os.makedirs(output_dir, exist_ok=True)
@@ -114,22 +114,22 @@ def main(fecha_proceso = None, usar_scraping = True):
 
         if df_and is not None:
             print("🔹 Filtrando y renombrando DataFrame Andalucía...")
-            df_and_final = functions.filtrar_renombrar_dataframe(df_and, "and", columnas_finales, columns_and, fecha_ejecucion)
+            df_and_final = functions.filtrar_renombrar_dataframe(df_and, "and",filename_codigo_nuts, columnas_finales, columns_and, fecha_ejecucion)
             print(f"✅ Andalucía procesada: {df_and_final.shape[0]} registros")
 
         if df_esp is not None:
             print("🔹 Filtrando y renombrando DataFrame Estado...")
-            df_esp_final = functions.filtrar_renombrar_dataframe(df_esp, "esp", columnas_finales, columns_esp, fecha_ejecucion)
+            df_esp_final = functions.filtrar_renombrar_dataframe(df_esp, "esp",filename_codigo_nuts, columnas_finales, columns_esp, fecha_ejecucion)
             print(f"✅ Estado procesado: {df_esp_final.shape[0]} registros")
             
         if df_eus is not None:
             print("🔹 Filtrando y renombrando DataFrame Euskadi...")
-            df_eus_final = functions.filtrar_renombrar_dataframe(df_eus, "eus", columnas_finales, columns_eus, fecha_ejecucion)
+            df_eus_final = functions.filtrar_renombrar_dataframe(df_eus, "eus",filename_codigo_nuts, columnas_finales, columns_eus, fecha_ejecucion)
             print(f"✅ Euskadi procesado: {df_eus_final.shape[0]} registros")
 
         if df_mad is not None:
             print("🔹 Filtrando y renombrando DataFrame Madrid...")
-            df_mad_final = functions.filtrar_renombrar_dataframe(df_mad, "mad", columnas_finales, columns_mad, fecha_ejecucion)
+            df_mad_final = functions.filtrar_renombrar_dataframe(df_mad, "mad",filename_codigo_nuts, columnas_finales, columns_mad, fecha_ejecucion)
             print(f"✅ Madrid procesado: {df_mad_final.shape[0]} registros")
 
         # Unificar
