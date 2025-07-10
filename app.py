@@ -208,15 +208,58 @@ def main():
                 seleccionadas = st.sidebar.multiselect(f"{col}", options=opciones, key=f"filtro_{col}")
                 if seleccionadas and len(seleccionadas) < 2:
                     df_no_favoritos = df_no_favoritos[df_no_favoritos[col].isin(seleccionadas)]
-
             elif pd.api.types.is_numeric_dtype(df_base[col]):
                 col_data = df_no_favoritos[col].dropna()
                 if not col_data.empty and col_data.min() != col_data.max():
+                    max_quantile = 0.95
                     min_val = float(col_data.min())
                     max_val = float(col_data.max())
-                    valores = st.sidebar.slider(f"{col}", min_value=min_val, max_value=max_val, value=(min_val, max_val))
-                    df_no_favoritos = df_no_favoritos[((df_no_favoritos[col] >= valores[0]) & (df_no_favoritos[col] <= valores[1]))]
+                    q_high = float(col_data.quantile(max_quantile))
 
+                    excluir_outliers = st.sidebar.checkbox(
+                        f"📉 Excluir valores máximos atípicos en {col}",
+                        value=True
+                    )
+
+                    max_slider_val = q_high if excluir_outliers else max_val
+
+                    if excluir_outliers:
+                        n_excluidas = (col_data > q_high).sum()
+                        st.sidebar.markdown(
+                            f"<small style='color: grey;'>ℹ️ Se excluyen {n_excluidas} licitaciones con valor superior a {q_high:,.2f}</small>",
+                            unsafe_allow_html=True
+                        )
+
+                    # Slider principal
+                    slider_vals = st.sidebar.slider(
+                        f"{col}",
+                        min_value=min_val,
+                        max_value=max_slider_val,
+                        value=(min_val, max_slider_val),
+                        step=(max_slider_val - min_val) / 100 if max_slider_val > min_val else 1.0,
+                        format="%.2f"
+                    )
+
+                    # Inputs manuales debajo del slider, alineados
+                    col_input_min, col_input_max = st.sidebar.columns(2)
+                    with col_input_min:
+                        input_min = st.number_input(
+                            f"Mín. {col}", value=float(slider_vals[0]), key=f"{col}_min_input", format="%.2f"
+                        )
+                    with col_input_max:
+                        input_max = st.number_input(
+                            f"Máx. {col}", value=float(slider_vals[1]), key=f"{col}_max_input", format="%.2f"
+                        )
+
+                    # Validar inputs y aplicar
+                    rango_min = max(min_val, input_min)
+                    rango_max = min(max_slider_val, input_max)
+                    if rango_min > rango_max:
+                        rango_min, rango_max = rango_max, rango_min
+
+                    df_no_favoritos = df_no_favoritos[
+                        (df_no_favoritos[col] >= rango_min) & (df_no_favoritos[col] <= rango_max)
+                    ]
             elif col == "Fecha Límite Presentación":
                 fechas_col = pd.to_datetime(df_no_favoritos[col], errors="coerce").dropna()
                 if fechas_col.empty:
